@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<script>(function(){var n=0;window.onerror=function(m,u,l){if(++n>2)return;try{var d=document.createElement("div");d.style.cssText="position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#7a0b2e;color:#fff;padding:8px 12px;border-radius:10px;font:12px/1.35 -apple-system,sans-serif";d.textContent="Erreur : "+m+" (ligne "+l+")";(document.body||document.documentElement).appendChild(d);}catch(e){}};})();</script>
+<script>(function(){window.dbg=function(w,e){try{var b=document.getElementById("dbgbox");if(!b){b=document.createElement("div");b.id="dbgbox";b.style.cssText="position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#7a0b2e;color:#fff;padding:8px 12px;border-radius:10px;font:13px/1.4 -apple-system,sans-serif;max-height:45%;overflow:auto";b.onclick=function(){if(b.parentNode)b.parentNode.removeChild(b)};(document.body||document.documentElement).appendChild(b);}var t=String(w+" : "+(e&&e.message?e.message:e)).replace(/</g,"&lt;");if(b.innerHTML.indexOf(t)<0)b.innerHTML+="<div>"+t+"</div>";}catch(x){}};window.onerror=function(m,u,l){window.dbg("Erreur",{message:m+" (ligne "+l+")"});};window.addEventListener("unhandledrejection",function(ev){window.dbg("Promesse",ev.reason);});})();</script>
 <meta charset="utf-8">
 <title>Dashboard</title>
 <!-- Version 17 · 20 nov. 2026 · iOS 12 -->
@@ -846,7 +846,7 @@ function tick() {
     e.style.transition = s == 0 ? "none" : "stroke-dasharray 1s linear";
     e.setAttribute("stroke-dasharray", (C * (s + 1) / 60).toFixed(1) + " " + C.toFixed(1));
 }
-tick();
+try{tick()}catch(e){dbg("tick",e)}
 setInterval(tick, 1000);
 /* ---------- Quotidien & Lune ---------- */
 function daily() {
@@ -1378,17 +1378,17 @@ setInterval(() => { const n = Date.now(); if (fixList && fixList.some(m => m.sta
         renderFix();
     }
 })();
-daily();
+try{daily()}catch(e){dbg("daily",e)}
 setInterval(daily, 36e5);
-weather();
+try{weather()}catch(e){dbg("weather",e)}
 setInterval(weather, 18e5);
-air();
+try{air()}catch(e){dbg("air",e)}
 setInterval(air, 36e5);
-news();
+try{news()}catch(e){dbg("news",e)}
 setInterval(news, 9e5);
-sports();
+try{sports()}catch(e){dbg("sports",e)}
 setInterval(sports, 9e5);
-fixtures();
+try{fixtures()}catch(e){dbg("fixtures",e)}
 setInterval(fixtures, 18e5);
 /* ---------- Navigation ---------- */
 const SC = [...document.querySelectorAll(".scene")];
@@ -1738,15 +1738,15 @@ $("imp").onchange = async () => {
         $("impMsg").innerHTML = `<p class="msg">Ce fichier n'est pas une sauvegarde valide.</p>`;
     }
 };
-ambient();
+try{ambient()}catch(e){dbg("ambient",e)}
 setInterval(ambient, 6e4);
-show(0);
+try{show(0)}catch(e){dbg("show",e)}
 /* ---------- Écran toujours allumé ---------- */
 const wl = () => { try {
     navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => { });
 }
 catch (e) { } };
-wl();
+try{wl()}catch(e){dbg("wl",e)}
 document.addEventListener("visibilitychange", () => { if (!document.hidden)
     wl(); });
 
