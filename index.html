@@ -635,7 +635,7 @@ input::-webkit-input-placeholder{-webkit-text-fill-color:var(--mu);color:var(--m
             <div class="row">
               <button type="button" class="btn" id="exp">Exporter</button>
               <button type="button" class="btn ghost" id="impBtn">Importer</button>
-              <input type="file" id="imp" class="vh" accept=".json,application/json">
+              <input type="file" id="imp" class="vh" accept=".json,application/json,.csv,text/csv">
             </div>
             <div id="impMsg"></div>
           </div>
@@ -1842,50 +1842,67 @@ $("exp").onclick = async () => {
 };
 let pendingImport = null;
 $("impBtn").onclick = () => $("imp").click();
-$("imp").onchange = async () => {
-    const f = $("imp").files[0];
+$("imp").onchange = function () {
+    var f = $("imp").files && $("imp").files[0];
     $("imp").value = "";
-    if (!f)
-        return;
-    try {
-        const j = JSON.parse(await f.text());
-        const list = Array.isArray(j) ? j : Array.isArray(j.birthdays) ? j.birthdays : null;
-        const bds = list ? list.filter(validBd).map(b => ({ n: b.n.trim().slice(0, 40), d: b.d })) : null;
-        const settings = j && !Array.isArray(j) && j.settings && typeof j.settings === "object" ? j.settings : null;
-        if (!bds && !settings)
-            throw 0;
-        pendingImport = { bds, settings };
-        const parts = [bds ? `${bds.length} anniversaire${bds.length > 1 ? "s" : ""}` : "", settings ? "les réglages" : ""].filter(Boolean).join(" et ");
-        $("impMsg").innerHTML = `<p class="msg">Importer ${parts} ? ${bds ? "La liste actuelle sera remplacée." : ""}</p><div class="row" style="margin-top:6px"><button type="button" class="btn" id="impOk">Importer</button><button type="button" class="btn ghost" id="impNo">Annuler</button></div>`;
-        $("impOk").onclick = () => {
-            const p = pendingImport;
-            pendingImport = null;
-            let id = Date.now();
-            if (p.bds)
-                saveBd(p.bds.map(b => (Object.assign(Object.assign({}, b), { i: id++ }))));
-            if (p.settings) {
-                const city = [cfg.lat, cfg.lon].join();
-                cfg = normCfg(p.settings);
-                saveCfg();
-                if ([cfg.lat, cfg.lon].join() !== city) {
-                    cDel("wx");
-                    cDel("air");
-                    weather();
-                    air();
-                }
-                news();
-                sports();
-                ambient();
+    if (!f) return;
+    function parseCsvBds(txt) {
+        var lines = String(txt || "").replace(/^\uFEFF/, "").split(/\r?\n/), out = [], i, line, sep, parts, n, rawD, m, a, b, mm, dd, dStr;
+        for (i = 0; i < lines.length; i++) {
+            line = lines[i].trim();
+            if (!line || /^pr[eé]nom/i.test(line)) continue;
+            sep = line.indexOf(";") >= 0 ? ";" : ",";
+            parts = line.split(sep);
+            if (parts.length < 2) continue;
+            n = parts[0].replace(/^["']|["']$/g, "").trim();
+            rawD = parts[1].replace(/^["']|["']$/g, "").trim();
+            m = /^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/.exec(rawD);
+            if (!m) continue;
+            a = Number(m[1]);
+            b = Number(m[2]);
+            if (a > 12 && b >= 1 && b <= 12) { dd = a; mm = b; }
+            else if (b > 12 && a >= 1 && a <= 12) { mm = a; dd = b; }
+            else { dd = a; mm = b; }
+            dStr = ("0" + mm).slice(-2) + "-" + ("0" + dd).slice(-2);
+            if (validBd({ n: n, d: dStr })) out.push({ n: n.slice(0, 40), d: dStr });
+        }
+        return out.length ? out : null;
+    }
+    function applyImport(bds, settings) {
+        var id = Date.now(), city = [cfg.lat, cfg.lon].join();
+        pendingImport = null;
+        if (bds) saveBd(bds.map(function (b) { return { n: b.n, d: b.d, i: id++ }; }));
+        if (settings) {
+            cfg = normCfg(settings);
+            saveCfg();
+            if ([cfg.lat, cfg.lon].join() !== city) { cDel("wx"); cDel("air"); weather(); air(); }
+            news(); sports(); ambient();
+        }
+        $("impMsg").innerHTML = '<p class="hint">✓ Import terminé.</p>';
+        bd(); renderSettings();
+    }
+    var fr = new FileReader();
+    fr.onload = function () {
+        try {
+            var txt = String(fr.result || ""), bds = null, settings = null, isCsv = /\.csv$/i.test(f.name || "");
+            if (!isCsv) {
+                var j = JSON.parse(txt);
+                var list = Array.isArray(j) ? j : (Array.isArray(j.birthdays) ? j.birthdays : null);
+                bds = list ? list.filter(validBd).map(function (b) { return { n: b.n.trim().slice(0, 40), d: b.d }; }) : null;
+                settings = (j && !Array.isArray(j) && j.settings && typeof j.settings === "object") ? j.settings : null;
             }
-            $("impMsg").innerHTML = `<p class="hint">✓ Import terminé.</p>`;
-            bd();
-            renderSettings();
-        };
-        $("impNo").onclick = () => { pendingImport = null; $("impMsg").innerHTML = ""; };
-    }
-    catch (_) {
-        $("impMsg").innerHTML = `<p class="msg">Ce fichier n'est pas une sauvegarde valide.</p>`;
-    }
+            if (!bds && !settings) bds = parseCsvBds(txt);
+            if (!bds && !settings) throw 0;
+            pendingImport = { bds: bds, settings: settings };
+            var parts = [bds ? (bds.length + " anniversaire" + (bds.length > 1 ? "s" : "")) : "", settings ? "les réglages" : ""].filter(Boolean).join(" et ");
+            $("impMsg").innerHTML = '<p class="msg">Importer ' + parts + ' ? ' + (bds ? "La liste actuelle sera remplacée." : "") + '</p><div class="row" style="margin-top:6px"><button type="button" class="btn" id="impOk">Importer</button><button type="button" class="btn ghost" id="impNo">Annuler</button></div>';
+            $("impOk").onclick = function () { var p = pendingImport; if (p) applyImport(p.bds, p.settings); };
+            $("impNo").onclick = function () { pendingImport = null; $("impMsg").innerHTML = ""; };
+        } catch (_) {
+            $("impMsg").innerHTML = '<p class="msg">Ce fichier n\'est pas une sauvegarde valide.</p>';
+        }
+    };
+    fr.readAsText(f);
 };
 try{ambient()}catch(e){dbg("ambient",e)}
 setInterval(ambient, 6e4);
